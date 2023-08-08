@@ -367,7 +367,7 @@ def pose_vec_to_mat(vec):
     Tmat = np.concatenate((Tmat, hfiller), axis=0)
     return Tmat
 
-def pose_vec_q_to_mat(vec):
+def pose_vec_q_to_mat_old(vec):
     tx = vec[1]
     ty = vec[2]
     tz = vec[3]
@@ -406,7 +406,7 @@ def dump_pose_seq_TUM(out_file, poses, times):
             f.write('%f %f %f %f %f %f %f %f\n' % (times[p], tx, ty, tz, qx, qy, qz, qw))
 
 
-'''def pose_vec_q_to_mat(vec):
+def pose_vec_q_to_mat(vec):
     if len(vec)==8:
         vec=vec[1:]
     assert len(vec)==7, "Invalid dimension for pose"
@@ -423,7 +423,7 @@ def dump_pose_seq_TUM(out_file, poses, times):
     Tmat = np.concatenate((rot, trans), axis=1)
     hfiller = np.array([0, 0, 0, 1]).reshape((1,4))
     Tmat = np.concatenate((Tmat, hfiller), axis=0)
-    return Tmat'''
+    return Tmat
 def pose_vec_q_to_mat1(vec):
     tx = vec[0]
     ty = vec[1]

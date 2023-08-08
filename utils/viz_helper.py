@@ -6,6 +6,9 @@ import time
 import pandas as pd
 import numpy as np
 
+viewer_origin = np.array([[1,0,0,0],[0,-1,0,0],[0,0,-1,0],[0,0,0,1]])
+vo_origin = np.array([[0,0,1,0],[-1,0,0,0],[0,-1,0,0],[0,0,0,1]])
+
 
 class viewer:
     def __init__(self,):
@@ -35,6 +38,9 @@ class viewer:
         self.prev_t = transformed[:3,-1]
 
     def update_pose_data(self, pose, color=[1, 0, 0]):
+        if pose.shape[-1] == 4:
+            pose = pose[:3,-1]
+
         if not type(self.prev_td) == list: 
             points = [self.prev_td, pose]
             lines = [[0, 1]]
@@ -82,9 +88,6 @@ class viewer:
         while 1:      
             self.update_view()
             time.sleep(0.01)
-
-
-
 
 
 def init_figure(height: int = 800) -> go.Figure:
@@ -262,9 +265,6 @@ def inv(T):
     T_[:3,3:] = - R.T @ t
     return T_
 
-
-viewer_origin = np.array([[1,0,0,0],[0,-1,0,0],[0,0,-1,0],[0,0,0,1]])
-vo_origin = np.array([[0,0,1,0],[-1,0,0,0],[0,-1,0,0],[0,0,0,1]])
 
 
 def display_poses_dataset(window,f_name='./data/pose_left.txt',color=[1,0,0],is_vo=False,data_origin=False):
