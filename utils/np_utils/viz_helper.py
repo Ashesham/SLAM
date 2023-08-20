@@ -5,6 +5,7 @@ import open3d as o3d
 import time
 import pandas as pd
 import numpy as np
+import tqdm
 
 viewer_origin = np.array([[1,0,0,0],[0,-1,0,0],[0,0,-1,0],[0,0,0,1]])
 vo_origin = np.array([[0,0,1,0],[-1,0,0,0],[0,-1,0,0],[0,0,0,1]])
@@ -60,6 +61,30 @@ class viewer:
         
         self.prev_td = pose
 
+    def update_pose_data_live(self, pose, color=[1, 0, 0]):
+        if pose.shape[-1] == 4:
+            pose = pose[:3,-1]
+
+        if not type(self.prev_td) == list: 
+            points = [self.prev_td, pose]
+            lines = [[0, 1]]
+            colors = [color]
+            line_set = o3d.geometry.LineSet()
+            line_set.points = o3d.utility.Vector3dVector(points)
+            line_set.lines = o3d.utility.Vector2iVector(lines)
+            line_set.colors = o3d.utility.Vector3dVector(colors)
+            self.vis.add_geometry(line_set)
+        else:
+            T = np.eye(4)
+            T [:3,-1] = pose
+            t1 = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.3)
+            t1.transform(T)
+            self.vis.add_geometry(t1)
+        
+        
+        self.prev_td = pose
+        self.update_view()
+
     def update_view(self):
         # cam = self.vis.get_view_control().convert_to_pinhole_camera_parameters()
         # self.vis.reset_view_point(True)
@@ -68,7 +93,42 @@ class viewer:
         self.vis.poll_events()
         self.vis.update_renderer()
 
-    def run(self): 
+    def draw_dots(self, poses, color=[1, 0, 0]):
+        ''' Draw spheres in the given coordinates
+        input:
+        pose -- q vector or 3d location [7 or 3]
+
+        '''
+        if poses.shape[-1] == 4:
+            poses = poses[:3,-1]
+
+        for i in tqdm.tqdm(poses):
+            point = o3d.geometry.TriangleMesh.create_sphere(0.05,resolution=2)
+            T = np.eye(4)
+            T[:3,3] = i[:3]
+            point.transform(T)
+            self.vis.add_geometry(point)
+
+    def draw_dots_live(self, poses, color=[1, 0, 0]):
+        ''' Draw spheres in the given coordinates
+        input:
+        pose -- q vector or 3d location [7 or 3]
+
+        '''
+        if poses.shape[-1] == 4:
+            poses = poses[:3,-1]
+
+        for i in tqdm.tqdm(poses):
+            point = o3d.geometry.TriangleMesh.create_sphere(0.05,resolution=2)
+            T = np.eye(4)
+            T[:3,3] = i[:3]
+            point.transform(T)
+            self.vis.add_geometry(point)
+            self.update_view()
+            time.sleep(0.01)
+
+
+    def init(self): 
         # Create Open3d visualization window
         self.vis = o3d.visualization.Visualizer()
         self.vis.create_window()
@@ -76,6 +136,9 @@ class viewer:
         # create coordinate frame
         coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame()
         self.vis.add_geometry(coordinate_frame)
+
+    def run(self):
+        self.vis.run()
         
     def _run(self):        
         # Create Open3d visualization window
