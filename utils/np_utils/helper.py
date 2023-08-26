@@ -3,6 +3,17 @@ import numpy as np
 import pandas as pd
 from .pose_helper import pose_vec_q_to_mat
 
+def inv(T):
+    '''Take a T matrix to provide inverse(fast)
+    Input: 
+    T       -- Transformation matrix to take inverse on 
+    Output:
+    T_      -- Inverse Transformation matrix'''
+    T_ = np.copy(T)
+    R,t = T[:3,:3],T[:3,3:]
+    T_[:3,:3] = R.T
+    T_[:3,3:] = - R.T @ t
+    return T_
 
 def txt_to_4x4(fname,datas=-1):
     '''Read file of pose q arrays 
@@ -13,7 +24,7 @@ def txt_to_4x4(fname,datas=-1):
 
     Output:
     data   -- np.array of all pose converted to T matrises      (nx4x4)'''
-    data = np.array(pd.read_csv(fname,delimiter=' '))[:datas]
+    data = np.array(pd.read_csv(fname,delimiter=' ', header = None))[:datas]
     data = np.array([pose_vec_q_to_mat(i) for i in data])
     return data
 
@@ -26,7 +37,10 @@ def txt_to_q(fname,datas=-1):
 
     Output:
     data   -- np.array of all pose converted to T matrises      (nx4x4)'''
-    data = np.array(pd.read_csv(fname,delimiter=' '))[:datas]
+    if datas == -1:
+        data = np.array(pd.read_csv(fname,delimiter=' ', header = None))
+    else:
+        data = np.array(pd.read_csv(fname,delimiter=' ', header = None))[:datas]
     return data
 
 def read_file_list(filename):

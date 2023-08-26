@@ -6,6 +6,7 @@ from evo.core.trajectory import PoseTrajectory3D
 from evo.core import sync
 import typing
 import torch
+import pytorch3d.transforms as T
 
 torch.set_printoptions(precision=6)
 
@@ -94,7 +95,7 @@ def se3(r: torch.tensor = torch.eye(3),
     :param t: 3x1 translation vector
     :return: SE(3) transformation matrix
     """
-    se3 = torch.eye(4,dtype=torch.float64)
+    se3 = torch.eye(4,dtype=torch.float64).to(r.device)
     se3[:3, :3] = r
     se3[:3, 3] = t
     return se3
@@ -118,7 +119,7 @@ def umeyama_alignment(x: torch.tensor, y: torch.tensor,
     m, n = x.shape
 
     # means, eq. 34 and 35
-    mean_x = x.mean(axis=1)
+    mean_x = x.mean(axis=1).to(torch.float64)
     mean_y = y.mean(axis=1)
 
     # variance, eq. 36
@@ -126,7 +127,7 @@ def umeyama_alignment(x: torch.tensor, y: torch.tensor,
     sigma_x = 1.0 / n * (torch.linalg.norm(x - mean_x[:, None])**2)
 
     # covariance matrix, eq. 38
-    outer_sum = torch.zeros((m, m))
+    outer_sum = torch.zeros((m, m),dtype=torch.float64).to(x.device)
     for i in range(n):
         outer_sum += torch.outer((y[:, i] - mean_y), (x[:, i] - mean_x))
     cov_xy = 1.0 / n * outer_sum
@@ -134,10 +135,11 @@ def umeyama_alignment(x: torch.tensor, y: torch.tensor,
     # SVD (text betw. eq. 38 and 39)
     u, d, v = torch.linalg.svd(cov_xy)
     if torch.count_nonzero(d > torch.finfo(d.dtype).eps) < m - 1:
-        raise "Degenerate covariance rank, Umeyama alignment is not possible"
+        # print("Degenerate covariance rank, Umeyama alignment is not possible")
+        return torch.eye(3).to(torch.float64).to(x.device),torch.ones(3).to(torch.float64).to(x.device),1 
 
     # S matrix, eq. 43
-    s = torch.eye(m)
+    s = torch.eye(m,dtype=torch.float64).to(x.device)
     if torch.linalg.det(u) * torch.linalg.det(v) < 0.0:
         # Ensure a RHS coordinate system (Kabsch algorithm).
         s[m - 1, m - 1] = -1
@@ -290,8 +292,8 @@ def align_origin_traj(traj_ref, traj_est) -> torch.tensor:
         return to_ref_origin
 
 def ape(traj_ref, traj_est, align: bool = False, correct_scale: bool = False, 
-        n_to_align: int = -1, align_origin: bool = False):
-
+        n_to_align: int = -1, align_origin: bool = False, return_res = False):
+    device = traj_ref.device
     # Align the trajectories.
     only_scale = correct_scale and not align
     
@@ -302,17 +304,20 @@ def ape(traj_ref, traj_est, align: bool = False, correct_scale: bool = False,
         traj_est = transform(alignment_transformation,traj_est)
     # Calculate APE.
     data = (traj_ref, traj_est)
-    E = [
-        relative_se3(x_t, x_t_star) for x_t, x_t_star in zip(
-            traj_est, traj_ref)
-    ]
+    E = torch.concat([
+        relative_se3(x_t.to(device), x_t_star).unsqueeze(0) for x_t, x_t_star in zip(
+        traj_est, traj_ref)])
+    error = T.se3_log_map(torch.transpose(E,dim0=1,dim1=2))
     
-    error = torch.tensor(
-        [(E_i - torch.eye(4)).pow(2).sum().sqrt() for E_i in E], requires_grad=True)
+    # error = torch.tensor(
+    #     [norm_tensor(E_i - torch.eye(4, device=traj_ref.device)) for E_i in E], requires_grad=True, device=traj_ref.device)
 
     squared_errors = torch.pow(error, 2)
     rmse = torch.sqrt(torch.mean(squared_errors))
     
+    # return rmse
+    if return_res:
+        return rmse, traj_ref, traj_est
     return rmse
 
 if __name__=='__main__':
